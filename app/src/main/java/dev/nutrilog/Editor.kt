@@ -19,14 +19,15 @@ import androidx.compose.ui.window.DialogProperties
         DropdownMenu(menu,{menu=false}) { options.forEach { DropdownMenuItem({Text(it)},{change(it);menu=false}) } }
     }
 }
-@Composable fun Sheet(title:String,close:()->Unit,content:@Composable ColumnScope.()->Unit) {
-    Dialog(close,properties=DialogProperties(usePlatformDefaultWidth=false)) {
+@Composable fun Sheet(title:String,close:()->Unit,action:@Composable ()->Unit = {},content:@Composable ColumnScope.()->Unit) {
+    Dialog(close,properties=DialogProperties(usePlatformDefaultWidth=false, decorFitsSystemWindows=false)) {
         Surface(Modifier.fillMaxSize()) {
             Column(Modifier.safeDrawingPadding().imePadding().padding(horizontal=18.dp)) {
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
                     Text(title,style=MaterialTheme.typography.headlineSmall); TextButton(close) { Text("Close") }
                 }
-                Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom=28.dp),verticalArrangement=Arrangement.spacedBy(8.dp),content=content)
+                action()
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom=28.dp),verticalArrangement=Arrangement.spacedBy(8.dp),content=content)
             }
         }
     }
@@ -38,7 +39,20 @@ import androidx.compose.ui.window.DialogProperties
     var confirm by remember { mutableStateOf(false) }
     var recipe by remember { mutableStateOf("") }
     var favorite by remember { mutableStateOf(false) }
-    Sheet(if(existing) "Edit entry" else "Review entries",onClose) {
+    Sheet(if(existing) "Edit entry" else "Review entries",onClose,action = {
+        if(warning.isNotBlank()) Text(warning,color=MaterialTheme.colorScheme.error)
+        Button({
+            runCatching {
+                val foods=rows.filter { it.kind=="Food" }
+                val extras=if(existing) emptyList() else buildList {
+                    if(favorite) addAll(foods.map { it.fresh("Saved food",it.stamp) })
+                    if(recipe.isNotBlank()) addAll(foods.map { it.fresh("Saved meal item",it.stamp).with("Recipe",recipe.trim()) })
+                }
+                val all=rows+extras
+                all.forEach { it.validate() }; onSave(all)
+            }.onFailure {warning=it.message ?: "Check the entry fields"}
+        },modifier=Modifier.fillMaxWidth()){Text(if(existing) "Save changes" else "Confirm and save")}
+    }) {
         rows.forEachIndexed { i,r -> key(r.id) {
             fun update(next:Record) { rows=rows.toMutableList().also { it[i]=next } }
             fun set(k:String,v:String) = update(r.with(k,v))
@@ -81,18 +95,6 @@ import androidx.compose.ui.window.DialogProperties
                 Field("Save as reusable meal (optional)",recipe){recipe=it}
             }
         }
-        if(warning.isNotBlank()) Text(warning,color=MaterialTheme.colorScheme.error)
-        Button({
-            runCatching {
-                val foods=rows.filter { it.kind=="Food" }
-                val extras=if(existing) emptyList() else buildList {
-                    if(favorite) addAll(foods.map { it.fresh("Saved food",it.stamp) })
-                    if(recipe.isNotBlank()) addAll(foods.map { it.fresh("Saved meal item",it.stamp).with("Recipe",recipe.trim()) })
-                }
-                val all=rows+extras
-                all.forEach { it.validate() }; onSave(all)
-            }.onFailure {warning=it.message ?: "Check the entry fields"}
-        },modifier=Modifier.fillMaxWidth()){Text(if(existing) "Save changes" else "Confirm and save")}
         if(existing) TextButton({confirm=true}) {Text("Delete entry",color=MaterialTheme.colorScheme.error)}
     }
     if(confirm) AlertDialog({confirm=false},title={Text("Delete this entry?")},text={Text(initial.first().name.ifBlank { initial.first().kind })},

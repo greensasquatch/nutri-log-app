@@ -189,7 +189,7 @@ class MainActivity:ComponentActivity(){
                 Row {OutlinedButton({export.launch("NutriLog-"+LocalDate.now(zone)+".json")}){Text("Export")}
                     TextButton({import.launch(arrayOf("application/json","text/plain","application/octet-stream"))}){Text("Restore")}}
                 TextButton({modal="wipe"}){Text("Erase local data")}
-                Text("NutriLog 0.2.1   ·   Database 1")
+                Text("NutriLog 0.2.2   ·   Database 1")
             }
             if(modal=="wipe") AlertDialog({modal="settings"},title={Text("Erase all local entries and settings?")},text={Text("Export a backup first if you want to keep your journal.")},confirmButton={TextButton({db.save(emptyList(),true);rows=emptyList();settings.edit().clear().apply();prefs=emptyMap();plan.forget();signedIn=false;keys.save("OpenAI","");keys.save("Claude","");prompt="";modal=""}){Text("Erase all")}},dismissButton={TextButton({modal="settings"}){Text("Cancel")}})
             restoreData?.let {(items,values)->AlertDialog({restoreData=null},title={Text("Replace local journal?")},text={Text("Verified backup contains "+items.size+" records. Restoring replaces current entries and settings.")},
