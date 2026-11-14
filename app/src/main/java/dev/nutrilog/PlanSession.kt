@@ -51,6 +51,16 @@ private fun fetch(url:String, fields:Map<String,String>?=null, bearer:String?=nu
         check(c.responseCode in 200..299) { "ChatGPT authorization request failed (HTTP "+c.responseCode+"). Try signing in again." }
         val body=c.inputStream.bufferedReader().use { it.readText() }
         return if(body.isBlank()) JSONObject() else JSONObject(body)
+    } catch (error:java.net.UnknownHostException) {
+        val host=URL(url).host
+        val stage=when {
+            url==tokenEndpoint && fields?.get("grant_type")=="authorization_code" -> "Exchanging browser approval"
+            url.endsWith("/openid-configuration") -> "Loading sign-in configuration"
+            url.endsWith("/models") -> "Loading available models"
+            fields==null -> "Loading identity verification keys"
+            else -> "Updating the ChatGPT session"
+        }
+        throw java.net.UnknownHostException("$stage: Android could not resolve $host. Check NutriLog’s network access, then retry.").apply { initCause(error) }
     } finally { c.disconnect() }
 }
 
@@ -63,8 +73,34 @@ class PlanSession(context:Context, private val vault:Keys) {
         check(installation.edit().putString("host",it).commit())
     }
 
-    // The system browser handles the password. A short-lived loopback listener only receives the code.
-    fun signIn(openBrowser:(Uri)->Unit) {
+    // Keep the short-lived grant only in memory. After exchange, retries must reuse the
+    // returned tokens: an authorization code cannot be redeemed a second time.
+    private class Grant(val client:String,val nonce:String,val fields:Map<String,String>) {
+        val until=android.os.SystemClock.elapsedRealtime()+180000
+        var tokens:JSONObject?=null
+    }
+    @Volatile private var pending:Grant?=null
+    fun canRetry()=pending?.let { android.os.SystemClock.elapsedRealtime()<it.until }==true
+    @Synchronized fun signIn(openBrowser:(Uri)->Unit) {
+        if(!canRetry()) pending=null
+        val grant=pending ?: browserGrant(openBrowser).also { pending=it }
+        try {
+            val tokens=grant.tokens ?: fetch(tokenEndpoint,grant.fields).also { grant.tokens=it }
+            val subject=verifyIdentity(tokens.getString("id_token"),grant.client,grant.nonce)
+            require(installation.getString("subject",subject)==subject) { "Sign out before switching accounts." }
+            authorize(tokens)
+            tokens.put("client",grant.client)
+            store(tokens)
+            installation.edit().putString("client",grant.client).putString("subject",subject).apply()
+            pending=null
+        } catch(e:java.net.UnknownHostException) {
+            throw e
+        } catch(e:Exception) {
+            pending=null
+            throw e
+        }
+    }
+    private fun browserGrant(openBrowser:(Uri)->Unit):Grant {
         val state=randomValue()
         val nonce=randomValue()
         val verifier=randomValue()
@@ -100,15 +136,9 @@ class PlanSession(context:Context, private val vault:Keys) {
         check(uri.getQueryParameter("error")==null) { "ChatGPT sign-in or plan access was declined." }
         val client=uri.getQueryParameter("client_id") ?: existing
         require(!client.isNullOrBlank() && client!="dynamic_agent_client" && (existing==null || existing==client))
-        val tokens=fetch(tokenEndpoint,mapOf("grant_type" to "authorization_code","client_id" to client,
+        return Grant(client,nonce,mapOf("grant_type" to "authorization_code","client_id" to client,
             "code" to requireNotNull(uri.getQueryParameter("code")), "code_verifier" to verifier,
             "redirect_uri" to callback.first,"resource" to resource))
-        val subject=verifyIdentity(tokens.getString("id_token"),client,nonce)
-        require(installation.getString("subject",subject)==subject) { "Sign out before switching accounts." }
-        authorize(tokens)
-        tokens.put("client",client)
-        store(tokens)
-        installation.edit().putString("client",client).putString("subject",subject).apply()
     }
 
     private fun authorize(tokens:JSONObject) {
@@ -147,6 +177,7 @@ class PlanSession(context:Context, private val vault:Keys) {
         return revoked
     }
     fun forget() {
+        pending=null
         vault.save(sessionKey,"")
         installation.edit().remove("client").remove("subject").apply()
     }
