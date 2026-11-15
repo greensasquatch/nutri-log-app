@@ -86,14 +86,16 @@ class MainActivity:ComponentActivity(){
                     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
                         Text(tabs[i],style=MaterialTheme.typography.headlineLarge)
                         when(i){
-                            0,1->{
+                            0->{
                                 DayPicker(date){date=it}
-                                Summary(dayRows,goalAt(rows,date.toString()),prefs["Net"]=="On")
-                                if(i==0){
+
+                                run {
                                     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
                                         Button({correction=null;modal="input"}){Text("New entry")}
                                         OutlinedButton({correction=null;speak()}){Text("Voice entry")}
                                     }
+                                    Summary(dayRows,goalAt(rows,date.toString()),prefs["Net"]=="On")
+                                    MacroPie(dayRows,goalAt(rows,date.toString()))
                                     val period=blank("Food",stamp)["Meal"]
                                     val suggestions=rows.filter {it.kind=="Food" || it.kind=="Saved food"}.groupBy {it.name.lowercase()}.values.sortedByDescending {items->
                                         items.count {it.kind=="Saved food"}*20+items.count {it["Meal"]==period}*3+items.size-if(items.any {it.day==date.toString()}) 3 else 0
@@ -104,28 +106,15 @@ class MainActivity:ComponentActivity(){
                                 }
                                 EntryList(dayRows,{open(listOf(it),true)},{items->open(items.map {it.fresh(time=now())})})
                             }
-                            2->{
-                                val goals=goalAt(rows,date.toString())
-                                DayPicker(date){date=it}
-                                Summary(dayRows,goals,false)
-                                Button({open(listOf((goals ?: blank("Goals")).fresh("Goals",stamp)))}){Text("Set goals from this date")}
-                                val target=goals?.number("Target kg") ?: 0.0
-                                if(target>0){
-                                    val current=rows.firstOrNull {it.kind=="Weight" && it.day<=date.toString()}?.number("Value")
-                                    Text("Weight goal · "+display(target/metricValue(1.0,weightUnit))+" "+weightUnit)
-                                    if(current!=null){Text(display(kotlin.math.abs(current-target)/metricValue(1.0,weightUnit))+" "+weightUnit+" from target")
-                                        val start=goals!!.number("Starting kg")
-                                        if(start>0 && start!=target)Text(display(100*(current-start)/(target-start))+"% of weight change goal")}
-                                }
-                                Text("Goal history",style=MaterialTheme.typography.titleMedium)
-                                rows.filter {it.kind=="Goals"}.forEach {r->TextButton({open(listOf(r),true)}){Text(r.day+"   ·   "+r["Calories"]+" kcal")}}
-                            }
+                            1->WeeklyHistory(rows,{open(listOf(it),true)},{items->open(items.map {it.fresh(time=now())})})
+                            2->GoalForm(rows,weightUnit,lengthUnit){goal->db.save(listOf(goal));rows=db.all()}
                             3->{
                                 Row {Button({open(listOf(blank("Weight")))}){Text("+ Weight")};TextButton({open(listOf(blank("Measurement")))}){Text("+ Measurement")}}
                                 val body=rows.filter {it.kind in listOf("Weight","Measurement")}
                                 if(body.isEmpty())Text("Record your first weight or measurement.")
                                 body.forEach {r->val unit=if(r.kind=="Weight")weightUnit else lengthUnit
-                                    ListItem(headlineContent={Text(r.name+"   "+display(r.number("Value")/metricValue(1.0,unit))+" "+unit)},supportingContent={Text(r.stamp.replace("T"," "))},modifier=Modifier.clickable {open(listOf(r),true)})}
+                                    val goal=goalAt(rows,r.day);val target=goal?.number(if(r.kind=="Weight") "Target kg" else measurementGoal(r.name)) ?: 0.0
+                                    ListItem(headlineContent={Text(r.name+"   "+display(r.number("Value")/metricValue(1.0,unit))+" "+unit)},supportingContent={Text(r.stamp.replace("T"," ")+if(target>0) "   ·   Goal "+display(target/metricValue(1.0,unit))+" "+unit else "")},modifier=Modifier.clickable {open(listOf(r),true)})}
                             }
                             4->Trends(rows,weightUnit,lengthUnit)
                         }
@@ -189,7 +178,7 @@ class MainActivity:ComponentActivity(){
                 Row {OutlinedButton({export.launch("NutriLog-"+LocalDate.now(zone)+".json")}){Text("Export")}
                     TextButton({import.launch(arrayOf("application/json","text/plain","application/octet-stream"))}){Text("Restore")}}
                 TextButton({modal="wipe"}){Text("Erase local data")}
-                Text("NutriLog 0.3.0   ·   Database 1")
+                Text("NutriLog 0.4.0   ·   Database 1")
             }
             if(modal=="wipe") AlertDialog({modal="settings"},title={Text("Erase all local entries and settings?")},text={Text("Export a backup first if you want to keep your journal.")},confirmButton={TextButton({db.save(emptyList(),true);rows=emptyList();settings.edit().clear().apply();prefs=emptyMap();plan.forget();signedIn=false;keys.save("OpenAI","");keys.save("Claude","");prompt="";modal=""}){Text("Erase all")}},dismissButton={TextButton({modal="settings"}){Text("Cancel")}})
             restoreData?.let {(items,values)->AlertDialog({restoreData=null},title={Text("Replace local journal?")},text={Text("Verified backup contains "+items.size+" records. Restoring replaces current entries and settings.")},

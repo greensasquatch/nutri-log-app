@@ -71,12 +71,12 @@ import androidx.compose.ui.window.DialogProperties
                 if(r.kind=="Saved meal item") Field("Saved meal name",r["Recipe"]){set("Recipe",it)}
             }
             val keys=when(r.kind) {
-                "Food","Saved food","Saved meal item" -> macros
+                "Food","Saved food","Saved meal item" -> macros+"Fibre"
                 "Exercise" -> listOf("Minutes","Distance","Intensity","Sets","Reps","Burned")
                 "Goals" -> macros+listOf("Starting kg","Target kg","Minutes","Burned")
                 else -> emptyList()
             }
-            keys.forEach { k -> Field(when(k) { "Burned"->"Estimated exercise kcal"; "Distance"->"Distance (km)"; in macros.drop(1)->k+" (g)"; else->k },r[k]){set(k,it)} }
+            keys.forEach { k -> Field(when(k) { "Fibre"->"Fibre (g, blank if unknown)"; "Burned"->"Estimated exercise kcal"; "Distance"->"Distance (km)"; in macros.drop(1)->k+" (g)"; else->k },r[k]){set(k,it)} }
             if(r.kind in listOf("Measurement","Weight")) {
                 val unit=unitFor(r.kind)
                 var raw by remember(r.id) { mutableStateOf(if(r["Value"].isBlank()) "" else display(r.number("Value")/metricValue(1.0,unit))) }

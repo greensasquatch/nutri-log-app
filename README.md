@@ -19,6 +19,14 @@ AI estimates send the submitted text, entry time, and any unsaved items being co
 
 Tap a saved row in Today, History or Body to edit or delete it manually. The only conversational correction path operates on an unsaved draft. Copying creates a new entry with a new ID. Enter a recipe name in review to save reusable ingredients. Food and exercise energy are totaled separately. Optional net calories appear in Settings.
 
+## Daily tracking in 0.4.0
+
+Today has five nutrient meters and a macro-energy pie chart. Protein and carbohydrate contribute 4 kcal/g and fat contributes 9 kcal/g to the three slices. Fibre has a separate editable minimum, initially 30 g for a new goal configuration.
+
+History groups days Monday through Sunday. Nutrition averages include days with at least one food entry. Fibre averages include only logged days with a known fibre value on every food. Expand any day to review and manually edit its entries.
+
+Use Goals to set an effective date, daily calories, macro percentages, fibre minimum, target weight and measurement targets. Macro percentages must add to 100. Body shows recorded readings alongside targets effective on the measurement date.
+
 ## Where to edit the code
 
 | Kotlin file under app/src/main/java/dev/nutrilog | Responsibility |

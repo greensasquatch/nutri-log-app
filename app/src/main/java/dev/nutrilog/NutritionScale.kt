@@ -4,7 +4,7 @@ enum class Nutrient(val key:String, val title:String, val defaultTarget:Int) {
     Calories("Calories","Calories",2400),
     Protein("Protein","Protein",180),
     Carbs("Carbs","Carbohydrates",240),
-    Fat("Fat","Fat",80)
+    Fat("Fat","Fat",80), Fibre("Fibre","Fibre",30)
 }
 
 object NutritionScale {

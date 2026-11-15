@@ -23,6 +23,7 @@ data class Record(val kind: String, val fields: Map<String,String> = emptyMap(),
         val next = quantity.toDoubleOrNull()
         var row = with("Quantity",quantity)
         if (next != null && next > 0 && old > 0) for (key in macros) row = row.with(key, (number(key)*next/old).toString())
+        if(next!=null && next>0 && old>0 && get("Fibre").isNotBlank()) row=row.with("Fibre",(number("Fibre")*next/old).toString())
         return row
     }
     fun validate() {
@@ -38,7 +39,7 @@ data class Record(val kind: String, val fields: Map<String,String> = emptyMap(),
         if(kind in listOf("Weight","Measurement")) positive("Value")
         if(kind == "Weight") require(get("Unit") == "kg")
         if(kind == "Measurement") require(get("Unit") == "cm")
-        for (key in macros + listOf("Burned","Minutes","Distance","Sets","Reps","Target kg","Starting kg")) {
+        for (key in macros + listOf("Fibre","Burned","Minutes","Distance","Sets","Reps","Target kg","Starting kg")) {
             val raw = get(key)
             if (raw.isNotBlank() || (kind=="Food" && key in macros)) require(raw.toDoubleOrNull()?.let { it.isFinite() && it >= 0 } == true) { "Check "+key }
         }

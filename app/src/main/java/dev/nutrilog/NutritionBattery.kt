@@ -32,7 +32,7 @@ private val orange=Color(0xFFFFB13B)
 private val red=Color(0xFFF04D55)
 private val empty=Color(0xFF293B4B)
 
-@Composable fun NutritionBattery(nutrientType:Nutrient,currentValue:Double,targetValue:Double?,unit:String) {
+@Composable fun NutritionBattery(nutrientType:Nutrient,currentValue:Double,targetValue:Double?,unit:String,unknownItems:Int=0) {
     val ratio=NutritionScale.ratio(currentValue,targetValue)
     val cells=NutritionScale.filled(ratio)
     // Compose starts at the initial target and respects the system animator duration scale.
@@ -50,27 +50,35 @@ private val empty=Color(0xFF293B4B)
         },label="Cell "+index) { boundary -> NutritionScale.fraction(boundary,index) }
     }
     val percent=ratio?.let { BigDecimal.valueOf(it).movePointRight(2).setScale(1,RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()+"%" }
-    val values=display(currentValue)+(if(ratio!=null) " / "+display(requireNotNull(targetValue)) else "")+" "+unit
+    val values=(if(unknownItems>0) "≥ " else "")+display(currentValue)+(if(ratio!=null) " / "+display(requireNotNull(targetValue)) else "")+" "+unit
     val light=MaterialTheme.colorScheme.surface.luminance()>0.5f
     val panel=if(light) Color(0xFF193040) else Color(0xFF101F2C)
     val text=Color(0xFFEEF6F8)
-    val over=if(nutrientType==Nutrient.Protein) blue else orange
+    val minimum=nutrientType==Nutrient.Protein || nutrientType==Nutrient.Fibre
+    val over=if(minimum) blue else orange
     val percentColor=when {
         ratio==null -> text
         ratio<=1.0 -> green
-        nutrientType!=Nutrient.Protein && ratio>1.15 -> red
+        !minimum && ratio>1.15 -> red
         else -> over
     }
     val shape=RoundedCornerShape(10.dp)
     Column(Modifier.fillMaxWidth().background(panel,shape).border(1.dp,Color(0xFF36576B),shape)
-        .clearAndSetSemantics { contentDescription=nutrientType.title+", "+values+", "+(percent?.plus(" of goal") ?: "goal unavailable") }
+        .clearAndSetSemantics { contentDescription=nutrientType.title+", "+values+(if(unknownItems>0) ", incomplete fibre data, " else ", ")+(percent?.plus(" of goal") ?: "goal unavailable") }
         .padding(horizontal=12.dp,vertical=8.dp)) {
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
             Text(nutrientType.title,Modifier.weight(1f),color=text,style=MaterialTheme.typography.titleSmall)
             Column(horizontalAlignment=Alignment.End) {
                 Text(values,color=text,style=MaterialTheme.typography.bodySmall)
-                Text(percent ?: "Goal unavailable",color=percentColor,style=MaterialTheme.typography.labelMedium,fontWeight=FontWeight.Bold)
+                Text((if(unknownItems>0 && percent!=null) "≥ " else "")+(percent ?: "Goal unavailable"),color=percentColor,style=MaterialTheme.typography.labelMedium,fontWeight=FontWeight.Bold)
             }
+        }
+        if(nutrientType==Nutrient.Fibre) {
+            val note=if(unknownItems>0) "Unknown fibre in "+unknownItems+" food entries"
+                else if(targetValue==null || targetValue<=0) "Set a minimum in Goals"
+                else if(currentValue<targetValue) display(targetValue-currentValue)+" g to go"
+                else if(currentValue==targetValue) "Minimum reached" else display(currentValue-targetValue)+" g above goal"
+            Text(note,color=text,style=MaterialTheme.typography.labelSmall)
         }
         Spacer(Modifier.height(4.dp))
         Canvas(Modifier.fillMaxWidth().height(23.dp).background(Color(0xFF09151E),RoundedCornerShape(3.dp))
@@ -92,7 +100,7 @@ private val empty=Color(0xFF293B4B)
                     drawRect(Color.White.copy(alpha=0.24f),pos,Size(width,1.dp.toPx()))
                 }
                 band(0f,15f,green)
-                if(nutrientType==Nutrient.Protein) band(15f,20f,blue) else {
+                if(minimum) band(15f,20f,blue) else {
                     band(15f,NutritionScale.warningBoundary,orange)
                     band(NutritionScale.warningBoundary,20f,red)
                 }

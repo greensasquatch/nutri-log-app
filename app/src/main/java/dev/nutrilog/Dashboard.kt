@@ -29,7 +29,8 @@ import java.time.format.DateTimeFormatter
             nutrientType=nutrient,
             currentValue=total(rows,"Food",nutrient.key),
             targetValue=NutritionScale.target(nutrient,goals),
-            unit=if(nutrient==Nutrient.Calories) "kcal" else "g"
+            unit=if(nutrient==Nutrient.Calories) "kcal" else "g",
+            unknownItems=if(nutrient==Nutrient.Fibre) FoodDay(rows).unknownFibre else 0
         )
     }
     val burned=total(rows,"Exercise","Burned")
