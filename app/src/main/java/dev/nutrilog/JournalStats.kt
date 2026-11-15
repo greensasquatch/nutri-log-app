@@ -15,13 +15,13 @@ class FoodDay(entries:List<Record>) {
     val unknownFibre=foods.count { it["Fibre"].toDoubleOrNull()==null }
     fun sum(key:String)=foods.sumOf { it.number(key) }
 }
-class FoodWeek(rows:List<Record>, date:LocalDate) {
+class FoodWeek(rows:List<Record>, date:LocalDate, completeOnly:Boolean=false) {
     val start=monday(date)
     val days=(0L..6L).associate { offset ->
         val day=start.plusDays(offset)
         day to FoodDay(rows.filter { it.day==day.toString() })
     }
-    val logged=days.values.filter { it.foods.isNotEmpty() }
+    val logged=days.values.filter { it.foods.isNotEmpty() && (!completeOnly || it.sum("Calories")>=1000.0) }
     val fibreDays=logged.filter { it.unknownFibre==0 }
     fun average(key:String):Double? {
         val available=if(key=="Fibre") fibreDays else logged

@@ -16,7 +16,7 @@ data class Record(val kind: String, val fields: Map<String,String> = emptyMap(),
     val day get() = stamp.substringBefore("T")
     val name get() = get("Name")
     fun with(key: String, value: String) = copy(fields = fields + (key to value))
-    fun fresh(type: String = kind, time: String = now()) = copy(kind=type,id=UUID.randomUUID().toString(),stamp=time)
+    fun fresh(type: String = kind, time: String = now()) = copy(kind=type,fields=fields-"Group id"-"Group name",id=UUID.randomUUID().toString(),stamp=time)
     // Nutrition fields contain totals for the entered quantity, including any manual label corrections.
     fun scaled(quantity: String): Record {
         val old = number("Quantity")
@@ -43,6 +43,16 @@ data class Record(val kind: String, val fields: Map<String,String> = emptyMap(),
             val raw = get(key)
             if (raw.isNotBlank() || (kind=="Food" && key in macros)) require(raw.toDoubleOrNull()?.let { it.isFinite() && it >= 0 } == true) { "Check "+key }
         }
+    }
+}
+// Copies retain ingredient grouping within this batch and get independent identities.
+fun copyToToday(items:List<Record>):List<Record> {
+    val time=now()
+    val groups=mutableMapOf<String,String>()
+    return items.map { item ->
+        val copy=item.fresh(time=time)
+        val group=item["Group id"]
+        if(group.isBlank()) copy else copy.with("Group id",groups.getOrPut(group){UUID.randomUUID().toString()}).with("Group name",item["Group name"])
     }
 }
 fun blank(kind:String,time:String=now()):Record {

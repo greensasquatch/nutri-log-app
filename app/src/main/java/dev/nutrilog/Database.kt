@@ -39,7 +39,7 @@ class Journal(context:Context): SQLiteOpenHelper(context,"journal.db",null,1) {
 private fun checksum(s:String)=MessageDigest.getInstance("SHA-256").digest(s.toByteArray()).joinToString("") { "%02x".format(it) }
 fun backup(rows:List<Record>,prefs:Map<String,String>):String {
     val data=JSONObject().put("records",JSONArray(rows.map { it.json() })).put("settings",JSONObject(prefs)).toString()
-    return JSONObject().put("format",1).put("database",1).put("version","0.4.0").put("created",now()).put("count",rows.size).put("sha256",checksum(data)).put("payload",data).toString()
+    return JSONObject().put("format",1).put("database",1).put("version","0.5.0").put("created",now()).put("count",rows.size).put("sha256",checksum(data)).put("payload",data).toString()
 }
 /** Inspect and decode in memory. The caller asks for confirmation before replacing journal data. */
 fun restore(s:String):Pair<List<Record>,Map<String,String>> {
@@ -54,4 +54,4 @@ fun restore(s:String):Pair<List<Record>,Map<String,String>> {
     val prefs=payload.getJSONObject("settings")
     return rows to prefs.keys().asSequence().filter { it in settingKeys }.associateWith { prefs.getString(it) }
 }
-val settingKeys=setOf("Plan model","Weight unit","Length unit","Theme","Net")
+val settingKeys=setOf("Plan model","Weight unit","Length unit","Theme","Net","History view","History complete","Body fat estimate","Tape formula")

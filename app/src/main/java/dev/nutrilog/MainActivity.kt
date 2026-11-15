@@ -79,15 +79,20 @@ class MainActivity:ComponentActivity(){
         val tabs=listOf("Today","History","Goals","Body","Trends")
         val pager=rememberPagerState {tabs.size}
         MaterialTheme(colorScheme=if(dark) darkColorScheme(primary=Color(0xFF93D5BA)) else lightColorScheme(primary=Color(0xFF22644F),primaryContainer=Color(0xFFD0EFDB))){
-            Scaffold(topBar={Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal=16.dp),Arrangement.SpaceBetween,androidx.compose.ui.Alignment.CenterVertically){
+            Scaffold(modifier=Modifier.fillMaxSize().safeDrawingPadding().imePadding(),contentWindowInsets=WindowInsets(0,0,0,0),topBar={Row(Modifier.fillMaxWidth().padding(horizontal=16.dp),Arrangement.SpaceBetween,androidx.compose.ui.Alignment.CenterVertically){
                 Text("NutriLog",style=MaterialTheme.typography.titleLarge);TextButton({modal="settings"}){Text("Settings")}
-            }},bottomBar={NavigationBar {tabs.forEachIndexed {i,t->NavigationBarItem(pager.currentPage==i,{scope.launch {pager.animateScrollToPage(i)}},icon={Text(listOf("◉","◷","◎","◇","∿")[i])},label={Text(t)})}}}){padding->
-                HorizontalPager(pager,Modifier.padding(padding).fillMaxSize()){i->
+            }},bottomBar={NavigationBar(modifier=Modifier.padding(bottom=8.dp),windowInsets=WindowInsets(0,0,0,0)) {tabs.forEachIndexed {i,t->NavigationBarItem(pager.currentPage==i,{scope.launch {pager.animateScrollToPage(i)}},icon={Text(listOf("◉","◷","◎","◇","∿")[i])},label={Text(t)})}}}){padding->
+                HorizontalPager(pager,Modifier.padding(padding).consumeWindowInsets(padding).fillMaxSize()){i->
                     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
                         Text(tabs[i],style=MaterialTheme.typography.headlineLarge)
                         when(i){
                             0->{
                                 DayPicker(date){date=it}
+                                goalAt(rows,date.toString())?.takeIf {it["Plan enabled"]=="On"}?.let {goal->
+                                    scheduledWeight(goal.number("Plan start kg"),goal.number("Target kg"),goal.number("Plan weekly kg"),LocalDate.parse(goal.day),date)?.let {kg->
+                                        Text("Planned weight   "+display(kg/metricValue(1.0,weightUnit))+" "+weightUnit)
+                                    }
+                                }
 
                                 run {
                                     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
@@ -104,12 +109,13 @@ class MainActivity:ComponentActivity(){
                                     suggestions.forEach {items->val r=items.first();TextButton({open(listOf(r.fresh("Food",stamp).with("Meal",period)))}){Text("+ "+r.name+"   ·   "+display(r.number("Calories"))+" kcal")}}
                                     OutlinedButton({modal="library"}){Text("Saved foods and meals")}
                                 }
-                                EntryList(dayRows,{open(listOf(it),true)},{items->open(items.map {it.fresh(time=now())})})
+                                EntryList(dayRows,{open(listOf(it),true)},{items->open(copyToToday(items))},{items->db.save(items);rows=db.all()})
                             }
-                            1->WeeklyHistory(rows,{open(listOf(it),true)},{items->open(items.map {it.fresh(time=now())})})
+                            1->WeeklyHistory(rows,prefs,::pref,{open(listOf(it),true)},{items->open(copyToToday(items))},{items->db.save(items);rows=db.all()})
                             2->GoalForm(rows,weightUnit,lengthUnit){goal->db.save(listOf(goal));rows=db.all()}
                             3->{
                                 Row {Button({open(listOf(blank("Weight")))}){Text("+ Weight")};TextButton({open(listOf(blank("Measurement")))}){Text("+ Measurement")}}
+                                BodyFatPanel(rows,lengthUnit,prefs,::pref){name->open(listOf(blank("Measurement").with("Name",name)))}
                                 val body=rows.filter {it.kind in listOf("Weight","Measurement")}
                                 if(body.isEmpty())Text("Record your first weight or measurement.")
                                 body.forEach {r->val unit=if(r.kind=="Weight")weightUnit else lengthUnit
@@ -178,7 +184,7 @@ class MainActivity:ComponentActivity(){
                 Row {OutlinedButton({export.launch("NutriLog-"+LocalDate.now(zone)+".json")}){Text("Export")}
                     TextButton({import.launch(arrayOf("application/json","text/plain","application/octet-stream"))}){Text("Restore")}}
                 TextButton({modal="wipe"}){Text("Erase local data")}
-                Text("NutriLog 0.4.0   ·   Database 1")
+                Text("NutriLog 0.5.0   ·   Database 1")
             }
             if(modal=="wipe") AlertDialog({modal="settings"},title={Text("Erase all local entries and settings?")},text={Text("Export a backup first if you want to keep your journal.")},confirmButton={TextButton({db.save(emptyList(),true);rows=emptyList();settings.edit().clear().apply();prefs=emptyMap();plan.forget();signedIn=false;keys.save("OpenAI","");keys.save("Claude","");prompt="";modal=""}){Text("Erase all")}},dismissButton={TextButton({modal="settings"}){Text("Cancel")}})
             restoreData?.let {(items,values)->AlertDialog({restoreData=null},title={Text("Replace local journal?")},text={Text("Verified backup contains "+items.size+" records. Restoring replaces current entries and settings.")},

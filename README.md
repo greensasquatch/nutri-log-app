@@ -47,6 +47,12 @@ Journal data stays in the application's private SQLite database. Records store d
 
 Manual export uses Android's file picker. Select Drive if the installed Google Drive app exposes it there. Backups contain entries, saved foods, meal ingredients, goals and display preferences. They are readable JSON with an integrity checksum. Provider credentials are excluded. On import the application verifies the checksum, version, count, IDs and record values, then asks before replacing journal records in a single SQLite transaction. A checksum detects damage and does not authenticate a backup.
 
+## Version 0.5.0
+
+Goals can plot a daily weight schedule from a starting weight, goal and weekly rate. The optional calorie estimator uses the Mifflin–St Jeor resting-energy equation and a selected activity multiplier. Tap the estimate to apply it before saving the dated goals. Body can estimate body fat from logged tape measurements. Both calculators run locally.
+
+Group ingredients within a meal from Today or an expanded History day. Expand a group to move it together or ungroup the ingredients. History can show numbers or battery meters and optionally exclude days below 1,000 kcal from averages. Tabs and review sheets reserve Android system-bar and keyboard space.
+
 ## Scope of version 0.2.0
 
 This build uses Android's built-in SQLiteOpenHelper. Room integration and encrypted scheduled Google Drive backups remain open. Goal history, selectable trend ranges, manual Drive file export, reusable meals and single-item favorites are implemented. Additional refinements from the specification include first-run setup, configurable meal times, richer recipe management, weekly statistics, weight-goal projections, optional body-fat estimates, undo and broader instrumented UI/database tests.

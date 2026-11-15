@@ -38,7 +38,7 @@ import java.time.format.DateTimeFormatter
     if(net) Text("Net energy · "+display(total(rows,"Food","Calories")-burned)+" kcal")
 }
 
-@Composable fun EntryList(rows:List<Record>,edit:(Record)->Unit,copy:(List<Record>)->Unit) {
+@Composable fun EntryList(rows:List<Record>,edit:(Record)->Unit,copy:(List<Record>)->Unit,save:(List<Record>)->Unit) {
     val items=rows.filter { it.kind=="Food" || it.kind=="Exercise" }
     if(items.isEmpty()) Text("No meals or activity recorded for this day.")
     items.groupBy { if(it.kind=="Food") it["Meal"] else "Exercise" }.forEach { (group,entries)->
@@ -46,10 +46,41 @@ import java.time.format.DateTimeFormatter
             Text(group,style=MaterialTheme.typography.titleMedium)
             if(group!="Exercise") TextButton({copy(entries)}) { Text("Copy to today") }
         }
-        entries.forEach { r ->
+        var grouping by remember(entries) { mutableStateOf(false) }
+        if(group!="Exercise" && entries.size>1) {
+            TextButton({grouping=true}){Text("Group ingredients")}
+            if(grouping) IngredientPicker(entries,{grouping=false},save)
+        }
+        entries.groupBy { it["Group id"].ifBlank { it.id } }.forEach { (_,members)->
+            val grouped=members.first()["Group id"].isNotBlank()
+            var expanded by remember(members.first().id){mutableStateOf(false)}
+            if(grouped){
+                TextButton({expanded=!expanded}){Text((if(expanded)"▾ " else "▸ ")+members.first()["Group name"]+" · "+display(members.sumOf {it.number("Calories")})+" kcal")}
+                if(expanded){
+                    Choices("Move group",group,mealTypes){meal->save(members.map {it.with("Meal",meal)})}
+                    TextButton({save(members.map {it.with("Group id","").with("Group name","")})}){Text("Ungroup ingredients")}
+                }
+            }
+            if(!grouped || expanded) members.forEach { r ->
             ListItem(headlineContent={Text(r.name)},supportingContent={Text(r.stamp.substringAfter("T").take(5)+"  ·  "+if(r.kind=="Food") r["Quantity"]+" "+r["Unit"]+"  ·  "+display(r.number("Calories"))+" kcal" else display(r.number("Minutes"))+" min  ·  ~"+display(r.number("Burned"))+" kcal")},
                 trailingContent={TextButton({copy(listOf(r))}){Text("Copy")}},modifier=Modifier.clickable { edit(r) })
+            }
         }
+    }
+}
+
+@Composable private fun IngredientPicker(entries:List<Record>,close:()->Unit,save:(List<Record>)->Unit) {
+    var selected by remember {mutableStateOf(emptySet<String>())}
+    var name by remember {mutableStateOf("")}
+    Sheet("Group ingredients",close,action={
+        Button({
+            val id=java.util.UUID.randomUUID().toString()
+            save(entries.filter {it.id in selected}.map {it.with("Group id",id).with("Group name",name.trim())})
+            close()
+        },enabled=selected.size>=2 && name.isNotBlank()){Text("Save group")}
+    }){
+        Field("Group name",name){name=it}
+        entries.forEach {r->CheckOption(r.name,r.id in selected){on->selected=if(on)selected+r.id else selected-r.id}}
     }
 }
 

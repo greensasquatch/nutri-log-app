@@ -22,7 +22,7 @@ import androidx.compose.ui.window.DialogProperties
 @Composable fun Sheet(title:String,close:()->Unit,action:@Composable ()->Unit = {},content:@Composable ColumnScope.()->Unit) {
     Dialog(close,properties=DialogProperties(usePlatformDefaultWidth=false, decorFitsSystemWindows=false)) {
         Surface(Modifier.fillMaxSize()) {
-            Column(Modifier.safeDrawingPadding().imePadding().padding(horizontal=18.dp)) {
+            Column(Modifier.safeDrawingPadding().imePadding().padding(start=18.dp,end=18.dp,bottom=8.dp)) {
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
                     Text(title,style=MaterialTheme.typography.headlineSmall); TextButton(close) { Text("Close") }
                 }
