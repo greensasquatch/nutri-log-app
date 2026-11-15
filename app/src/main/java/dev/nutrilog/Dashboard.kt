@@ -24,20 +24,13 @@ import java.time.format.DateTimeFormatter
 }
 
 @Composable fun Summary(rows:List<Record>,goals:Record?,net:Boolean) {
-    Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)) {
-        Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-            Text("Food intake",style=MaterialTheme.typography.labelLarge)
-            Text(display(total(rows,"Food","Calories"))+" kcal",style=MaterialTheme.typography.headlineLarge)
-            macros.forEach { key ->
-                val sum=total(rows,"Food",key); val goal=goals?.number(key) ?: 0.0
-                val unit=if(key=="Calories") " kcal" else " g"
-                if(goal>0) {
-                    val delta=goal-sum
-                    Text(key+"   "+display(sum)+" / "+display(goal)+unit+"   ·   "+display(kotlin.math.abs(delta))+if(delta<0) " over" else " left")
-                    LinearProgressIndicator(progress={ (sum/goal).coerceIn(0.0,1.0).toFloat() },modifier=Modifier.fillMaxWidth())
-                } else if(key!="Calories") Text(key+"   "+display(sum)+unit)
-            }
-        }
+    Nutrient.values().forEach { nutrient ->
+        NutritionBattery(
+            nutrientType=nutrient,
+            currentValue=total(rows,"Food",nutrient.key),
+            targetValue=NutritionScale.target(nutrient,goals),
+            unit=if(nutrient==Nutrient.Calories) "kcal" else "g"
+        )
     }
     val burned=total(rows,"Exercise","Burned")
     Text("Exercise · "+display(total(rows,"Exercise","Minutes"))+" min   /   "+display(burned)+" kcal estimated")

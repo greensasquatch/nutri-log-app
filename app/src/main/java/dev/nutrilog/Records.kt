@@ -48,6 +48,7 @@ fun blank(kind:String,time:String=now()):Record {
     val meal = when(time.substringAfter("T").take(2).toInt()) { in 5..10 -> "Breakfast"; in 11..14 -> "Lunch"; in 17..21 -> "Dinner"; else -> "Snack" }
     val base = when(kind) {
         "Food" -> macros.associateWith { "0" } + mapOf("Meal" to meal,"Quantity" to "1","Unit" to "serving")
+        "Goals" -> Nutrient.values().associate { it.key to it.defaultTarget.toString() }
         "Weight" -> mapOf("Name" to "Weight","Unit" to "kg")
         "Measurement" -> mapOf("Name" to "Waist","Unit" to "cm")
         else -> emptyMap()
