@@ -49,7 +49,7 @@ Manual export uses Android's file picker. Select Drive if the installed Google D
 
 ## Version 0.5.0
 
-Goals can plot a daily weight schedule from a starting weight, goal and weekly rate. The optional calorie estimator uses the Mifflin–St Jeor resting-energy equation and a selected activity multiplier. Tap the estimate to apply it before saving the dated goals. Body can estimate body fat from logged tape measurements. Both calculators run locally.
+Goals can plot a daily weight schedule from a starting weight, goal and weekly rate. The optional calorie estimator uses the Mifflin–St Jeor resting-energy equation and a selected activity multiplier. Enable calculated calories and enter your weekly change in lb or kg. The calorie and macro previews update as you edit. Save to apply the dated targets. Body can estimate body fat from logged tape measurements. Both calculators run locally.
 
 Group ingredients within a meal from Today or an expanded History day. Expand a group to move it together or ungroup the ingredients. History can show numbers or battery meters and optionally exclude days below 1,000 kcal from averages. Tabs and review sheets reserve Android system-bar and keyboard space.
 

@@ -104,37 +104,41 @@ import kotlin.math.abs
             if(ratio.isEmpty()) "" else if(i<2) firstTwo[i] else display(100-firstTwo.sumOf { it.toDouble() }) } }
         for(k in listOf("Starting kg","Target kg")) values[k]=r[k].toDoubleOrNull()?.let {display(it/metricValue(1.0,weightUnit))}.orEmpty()
         r.fields.filterKeys { it.startsWith("Measure cm ") }.forEach { (k,v)->values[k]=v.toDoubleOrNull()?.let {display(it/metricValue(1.0,lengthUnit))}.orEmpty() }
-        for(k in listOf("Minutes","Burned","Plan age","Plan sex","Plan activity","Plan weekly kg","Plan enabled")) values[k]=r[k]
+        for(k in listOf("Minutes","Burned","Plan age","Plan sex","Plan activity","Plan enabled","Plan auto calories")) values[k]=r[k]
+        values["Weekly change"]=r["Plan weekly kg"].toDoubleOrNull()?.let {display(it/metricValue(1.0,weightUnit))}.orEmpty()
         values
     }
     fun put(k:String,v:String){draft[k]=v;notice=""}
-    Field("Daily calories (kcal)",draft["Calories"].orEmpty()){put("Calories",it)}
+    val planning=draft["Plan enabled"]=="On"
+    val recorded=latestWeight(rows,effective)
+    val startKg=recorded ?: draft["Starting kg"]?.toDoubleOrNull()?.let {metricValue(it,weightUnit)}
+    val height=latestHeight(rows,effective)
+    val target=draft["Target kg"]?.toDoubleOrNull()?.let {metricValue(it,weightUnit)}
+    val rate=draft["Weekly change"]?.toDoubleOrNull()?.let {metricValue(it,weightUnit)}
+    val estimate=calorieEstimate(startKg ?: 0.0,height ?: 0.0,draft["Plan age"]?.toIntOrNull() ?: 0,
+        draft["Plan sex"].orEmpty(),draft["Plan activity"].orEmpty(),target ?: 0.0,rate ?: 0.0)
+    val auto=planning && draft["Plan auto calories"]=="On"
+    val calories=if(auto) estimate?.let {Math.round(it).toDouble()} else draft["Calories"]?.toDoubleOrNull()
+    CheckOption("Calculate a daily weight plan",planning){put("Plan enabled",if(it)"On" else "Off")}
+    if(planning) CheckOption("Calculate calories from my weekly weight goal",auto){put("Plan auto calories",if(it)"On" else "Off")}
+    if(auto) Text("Estimated daily target   "+(calories?.let {display(it)+" kcal"} ?: "Complete the weight plan below"))
+    else Field("Daily calories (kcal)",draft["Calories"].orEmpty()){put("Calories",it)}
     Text("Macro targets",style=MaterialTheme.typography.titleMedium)
     energyFactors.forEach { (name,factor)->
-        val grams=(draft["Calories"]?.toDoubleOrNull() ?: 0.0)*(draft[name]?.toDoubleOrNull() ?: 0.0)/100/factor
+        val grams=(calories ?: 0.0)*(draft[name]?.toDoubleOrNull() ?: 0.0)/100/factor
         Field(name+" (%)"+if(grams.isFinite()) " · "+display(grams)+" g" else "",draft[name].orEmpty()){put(name,it)}
     }
     Field("Daily fibre minimum (g)",draft["Fibre"].orEmpty()){put("Fibre",it)}
     Field("Starting weight ("+weightUnit+")",draft["Starting kg"].orEmpty()){put("Starting kg",it)}
     Field("Target weight ("+weightUnit+")",draft["Target kg"].orEmpty()){put("Target kg",it)}
-    val planning=draft["Plan enabled"]=="On"
-    CheckOption("Calculate weight and calorie goals",planning){put("Plan enabled",if(it)"On" else "Off")}
-    val recorded=rows.filter {it.kind=="Weight" && it.day<=effective}.maxByOrNull {it.stamp}?.number("Value")
-    val startKg=recorded ?: draft["Starting kg"]?.toDoubleOrNull()?.let {metricValue(it,weightUnit)}
     if(planning){
-        val height=rows.filter {it.kind=="Measurement" && it.name.trim().equals("Height",true) && it.day<=effective}.maxByOrNull {it.stamp}?.number("Value")
-        val target=draft["Target kg"]?.toDoubleOrNull()?.let {metricValue(it,weightUnit)}
         Text("Starting from "+(startKg?.let {display(it/metricValue(1.0,weightUnit))+" "+weightUnit} ?: "a weight entered above or logged in Body"))
         Field("Age (years)",draft["Plan age"].orEmpty()){put("Plan age",it)}
         Choices("Sex for calorie estimate",draft["Plan sex"].orEmpty().ifBlank {"Choose"},listOf("Male","Female")){put("Plan sex",it)}
         Choices("Activity level",draft["Plan activity"].orEmpty().ifBlank {"Choose"},activityFactors.keys.toList()){put("Plan activity",it)}
-        Choices("Weekly weight change",draft["Plan weekly kg"].orEmpty().ifBlank {"Choose"}+" kg/week",listOf("0.25","0.5")){put("Plan weekly kg",it)}
-        val rate=draft["Plan weekly kg"]?.toDoubleOrNull()
-        val estimate=calorieEstimate(startKg ?: 0.0,height ?: 0.0,draft["Plan age"]?.toIntOrNull() ?: 0,
-            draft["Plan sex"].orEmpty(),draft["Plan activity"].orEmpty(),target ?: 0.0,rate ?: 0.0)
-        if(height==null)Text("Log height in Body to estimate calories.")
-        if(estimate!=null) TextButton({put("Calories",Math.round(estimate).toString())}){Text("Use estimated "+Math.round(estimate)+" kcal/day")}
-        else if(height!=null)Text("An estimate requires adult age, sex, activity, weights and a weekly rate. Estimates below 1,000 kcal/day are unavailable.")
+        Field("Weekly weight change ("+weightUnit+"/week)",draft["Weekly change"].orEmpty()){put("Weekly change",it)}
+        if(auto && height==null)Text("Log height in Body to estimate calories.")
+        else if(auto && estimate==null)Text("An estimate requires adult age, sex, activity, weights and a weekly rate. Estimates below 1,000 kcal/day are unavailable.")
     }
     val options=(listOf("Waist","Chest","Hips","Neck","Upper arm","Forearm","Thigh","Calf","Shoulders")+
         rows.filter { it.kind=="Measurement" }.map { it.name }+draft.keys.filter {it.startsWith("Measure cm ")}.map {it.removePrefix("Measure cm ")}).distinctBy { measurementGoal(it) }
@@ -147,19 +151,19 @@ import kotlin.math.abs
     Button({
         runCatching {
             fun numeric(key:String):Double = requireNotNull(draft[key]?.toDoubleOrNull()?.takeIf {it.isFinite() && it>=0}){"Check "+key}
-            val kcal=numeric("Calories")
+            val kcal=requireNotNull(calories?.takeIf {it.isFinite()}) {"Complete the calorie estimate or enter a manual target."}
             require(kcal>0) {"Enter a positive calorie target."}
             require(abs(energyFactors.keys.sumOf {numeric(it)}-100)<0.001) {"Macro ratios must total 100%."}
             // Editing an effective day reuses its most recent goal ID and time.
             var record=if(prior?.day==effective) prior else (prior ?: blank("Goals")).fresh("Goals",effective+"T00:00")
             if(planning){
-                require(startKg!=null && startKg>0 && numeric("Target kg")>0 && numeric("Plan weekly kg")>0){"Enter starting and target weights and choose a weekly change."}
-                record=record.with("Plan start kg",startKg.toString())
+                require(startKg!=null && startKg>0 && numeric("Target kg")>0 && numeric("Weekly change")>0){"Enter starting and target weights and choose a weekly change."}
+                record=record.with("Plan start kg",startKg.toString()).with("Plan weekly kg",metricValue(numeric("Weekly change"),weightUnit).toString())
             }
             draft.filterKeys {it.startsWith("Plan ")}.forEach { (k,v)->record=record.with(k,v) }
             record=record.with("Calories",kcal.toString())
             energyFactors.forEach { (name,factor)->record=record.with("Ratio "+name,numeric(name).toString()).with(name,(kcal*numeric(name)/100/factor).toString()) }
-            draft.keys.filter { it !in energyFactors.keys && it!="Calories" && !it.startsWith("Plan ") }.forEach { k->
+            draft.keys.filter { it !in energyFactors.keys && it!="Calories" && it!="Weekly change" && !it.startsWith("Plan ") }.forEach { k->
                 val value=if(draft[k].isNullOrBlank()) "" else {
                     val n=numeric(k)
                     when { k.endsWith(" kg")->metricValue(n,weightUnit); k.startsWith("Measure cm ")->metricValue(n,lengthUnit); else->n }.toString()

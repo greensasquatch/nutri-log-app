@@ -18,6 +18,19 @@ class PlanningTest {
         assertTrue(kcal("Active",75.0)>kcal("Light activity",75.0))
         assertNull(calorieEstimate(80.0,180.0,0,"Male","Active",75.0,0.25))
     }
+    @Test fun dailyTargetsUseOnlyMeasurementsAvailableOnTheSelectedDay() {
+        val goal=blank("Goals","2024-01-01T08:00").with("Plan enabled","On").with("Plan auto calories","On")
+            .with("Plan start kg","80").with("Target kg","75").with("Plan weekly kg",metricValue(0.5,"lb").toString())
+            .with("Plan age","40").with("Plan sex","Male").with("Plan activity","Sedentary").with("Ratio Protein","30")
+        val height=blank("Measurement",goal.stamp).with("Name","Height").with("Value","180")
+        val weight=blank("Weight","2024-01-03T09:00").with("Value","79")
+        val rows=listOf(goal,height,weight)
+        val earlier=goalAt(rows,"2024-01-02")!!
+        assertEquals(1827.0,earlier.number("Calories"),0.0)
+        assertEquals(1815.0,goalAt(rows,"2024-01-03")!!.number("Calories"),0.0)
+        assertEquals(1827.0*0.3/4,earlier.number("Protein"),0.0001)
+        assertEquals(goal.number("Calories"),goalAt(listOf(goal.with("Plan auto calories","Off"),height,weight),"2024-01-03")!!.number("Calories"),0.0)
+    }
     @Test fun bodyFatAndMissingMeasurements() {
         fun inches(n:Int)=2.54*n
         assertEquals(21.26,estimatedBodyFat(false,inches(70),inches(36),inches(15))!!,0.1)

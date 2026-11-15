@@ -67,6 +67,23 @@ fun blank(kind:String,time:String=now()):Record {
     return Record(kind,base,stamp=time)
 }
 fun total(rows:List<Record>,kind:String,key:String) = rows.filter { it.kind==kind }.sumOf { it.number(key) }
-fun goalAt(rows:List<Record>,day:String) = rows.filter { it.kind=="Goals" && it.day<=day }.maxByOrNull { it.stamp }
+fun latestWeight(rows:List<Record>,day:String)=rows.filter {it.kind=="Weight" && it.day<=day}.maxByOrNull {it.stamp}?.number("Value")
+fun latestHeight(rows:List<Record>,day:String)=rows.filter {it.kind=="Measurement" && it.name.trim().equals("Height",true) && it.day<=day}.maxByOrNull {it.stamp}?.number("Value")
+
+fun goalAt(rows:List<Record>,day:String):Record? {
+    val goal=rows.filter {it.kind=="Goals" && it.day<=day}.maxByOrNull {it.stamp} ?: return null
+    if(goal["Plan auto calories"]!="On" || goal["Plan enabled"]!="On") return goal
+    // Resolve each historical day's target with measurements available on that date.
+    val start=goal.number("Plan start kg")
+    val kg=latestWeight(rows,day) ?: start
+    val target=goal.number("Target kg")
+    val reached=(target-start)*(target-kg)<=0
+    val estimate=calorieEstimate(kg,latestHeight(rows,day) ?: return goal,goal["Plan age"].toIntOrNull() ?: return goal,
+        goal["Plan sex"],goal["Plan activity"],if(reached) kg else target,goal.number("Plan weekly kg")) ?: return goal
+    val kcal=Math.round(estimate).toDouble()
+    var daily=goal.with("Calories",kcal.toString())
+    energyFactors.forEach { (name,factor)->daily=daily.with(name,(kcal*goal.number("Ratio "+name)/100/factor).toString()) }
+    return daily
+}
 fun display(n:Double) = java.math.BigDecimal.valueOf(n).setScale(2,java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
 fun metricValue(value:Double,unit:String) = when(unit) { "lb" -> value*0.45359237; "in" -> value*2.54; else -> value }
